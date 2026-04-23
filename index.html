@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Memory Match — SalStack Playground</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #070b17;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', 'Fira Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 24px 16px 40px;
+    }
+
+    a { color: #06b6d4; text-decoration: none; }
+    a:hover { opacity: 0.75; }
+
+    .back { align-self: flex-start; font-size: 0.78rem; color: #475569; margin-bottom: 20px; }
+    .back:hover { color: #06b6d4; }
+
+    .window {
+      background: #0d1526;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .win-bar {
+      background: #111827;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot-r { background: #ef4444; }
+    .dot-y { background: #f59e0b; }
+    .dot-g { background: #22c55e; }
+    .win-title  { margin-left: 8px; font-size: 0.75rem; color: #475569; }
+    .win-stats  { margin-left: auto; font-size: 0.75rem; color: #64748b; display: flex; gap: 16px; }
+
+    .win-body { padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      width: 100%;
+      max-width: 360px;
+    }
+
+    .card {
+      aspect-ratio: 1;
+      position: relative;
+      cursor: pointer;
+    }
+    .card-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.4s;
+      border-radius: 8px;
+    }
+    .card.flipped .card-inner,
+    .card.matched .card-inner { transform: rotateY(180deg); }
+
+    .card-face {
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backface-visibility: hidden;
+    }
+    .card-back {
+      background: #111827;
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 1.1rem;
+      color: #334155;
+    }
+    .card-front {
+      background: #0d1526;
+      border: 1px solid rgba(6,182,212,0.3);
+      font-size: 1.6rem;
+      transform: rotateY(180deg);
+    }
+    .card.matched .card-front {
+      border-color: rgba(74,222,128,0.5);
+      background: rgba(74,222,128,0.06);
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid rgba(6,182,212,0.4);
+      color: #06b6d4;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(6,182,212,0.1); border-color: #06b6d4; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .name-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .name-input {
+      background: #070b17;
+      border: 1px solid rgba(6,182,212,0.3);
+      color: #e2e8f0;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 0.8rem;
+      width: 160px;
+    }
+    .name-input:focus { outline: none; border-color: #06b6d4; }
+    .name-input::placeholder { color: #334155; }
+
+    .result-line { font-size: 0.82rem; color: #4ade80; text-align: center; min-height: 1em; }
+
+    .lb-panel {
+      width: 100%;
+      max-width: 480px;
+      background: #0d1526;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    .lb-bar   { background: #111827; padding: 10px 16px; font-size: 0.72rem; color: #475569; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .lb-list  { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .lb-row   { display: flex; align-items: center; gap: 10px; font-size: 0.78rem; }
+    .lb-rank  { color: #334155; width: 20px; text-align: right; }
+    .lb-rank.gold   { color: #f59e0b; }
+    .lb-rank.silver { color: #94a3b8; }
+    .lb-rank.bronze { color: #b45309; }
+    .lb-name  { flex: 1; color: #94a3b8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lb-val   { color: #06b6d4; }
+    .lb-empty { font-size: 0.75rem; color: #334155; padding: 8px 16px; }
+  </style>
+</head>
+<body>
+
+<a href="../../projects.html#playground" class="back">← back to projects</a>
+
+<div class="window">
+  <div class="win-bar">
+    <span class="dot dot-r"></span>
+    <span class="dot dot-y"></span>
+    <span class="dot dot-g"></span>
+    <span class="win-title">memory_match.js</span>
+    <div class="win-stats">
+      <span>moves: <span id="moves-disp">0</span></span>
+      <span>time: <span id="time-disp">0s</span></span>
+    </div>
+  </div>
+  <div class="win-body">
+
+    <div class="grid" id="grid"></div>
+
+    <p class="result-line" id="result"></p>
+
+    <div class="name-row">
+      <input class="name-input" id="player-name" placeholder="your name" maxlength="20" />
+      <button class="btn" id="btn-restart">$ restart</button>
+      <button class="btn" id="btn-push" style="display:none;">$ push_score</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="lb-panel">
+  <div class="lb-bar">// top scores — memory match (higher = better)</div>
+  <div class="lb-list" id="lb-list"><p class="lb-empty">loading…</p></div>
+</div>
+
+<script src="../leaderboard.js"></script>
+<script>
+const EMOJIS = ['🚀','⚡','🔥','💎','🌊','🎯','🛸','🦊'];
+const gridEl    = document.getElementById('grid');
+const movesEl   = document.getElementById('moves-disp');
+const timeEl    = document.getElementById('time-disp');
+const resultEl  = document.getElementById('result');
+const btnRestart= document.getElementById('btn-restart');
+const btnPush   = document.getElementById('btn-push');
+const nameInput = document.getElementById('player-name');
+const lbList    = document.getElementById('lb-list');
+
+let flipped = [], matched = 0, moves = 0, seconds = 0, timer, locked = false, lastScore;
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function initGame() {
+  clearInterval(timer);
+  flipped = []; matched = 0; moves = 0; seconds = 0; locked = false;
+  movesEl.textContent = '0';
+  timeEl.textContent  = '0s';
+  resultEl.textContent = '';
+  btnPush.style.display = 'none';
+
+  const cards = shuffle([...EMOJIS, ...EMOJIS]);
+  gridEl.innerHTML = '';
+
+  cards.forEach(emoji => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back">◈</div>
+        <div class="card-face card-front">${emoji}</div>
+      </div>`;
+    card.dataset.emoji = emoji;
+    card.addEventListener('click', () => flipCard(card));
+    gridEl.appendChild(card);
+  });
+
+  timer = setInterval(() => {
+    seconds++;
+    timeEl.textContent = seconds + 's';
+  }, 1000);
+}
+
+function flipCard(card) {
+  if (locked || card.classList.contains('flipped') || card.classList.contains('matched')) return;
+  card.classList.add('flipped');
+  flipped.push(card);
+
+  if (flipped.length === 2) {
+    moves++;
+    movesEl.textContent = moves;
+    locked = true;
+
+    if (flipped[0].dataset.emoji === flipped[1].dataset.emoji) {
+      flipped.forEach(c => c.classList.replace('flipped','matched'));
+      flipped = [];
+      locked  = false;
+      matched++;
+
+      if (matched === EMOJIS.length) {
+        clearInterval(timer);
+        lastScore = Math.max(0, 1000 - (moves - EMOJIS.length) * 10 - seconds * 2);
+        resultEl.textContent = `// done! score: ${lastScore}`;
+        btnPush.style.display = '';
+      }
+    } else {
+      setTimeout(() => {
+        flipped.forEach(c => c.classList.remove('flipped'));
+        flipped = [];
+        locked  = false;
+      }, 900);
+    }
+  }
+}
+
+btnRestart.addEventListener('click', initGame);
+
+btnPush.addEventListener('click', async () => {
+  const name = nameInput.value.trim() || 'anonymous';
+  btnPush.disabled = true;
+  btnPush.textContent = 'pushing…';
+  const disp = `${lastScore} pts (${moves} moves, ${seconds}s)`;
+  const rank  = await LB.save('MemoryMatch', name, lastScore, disp);
+  btnPush.textContent = `✓ rank #${rank}`;
+  await loadLeaderboard();
+});
+
+async function loadLeaderboard() {
+  const entries = await LB.getTop('MemoryMatch', 10);
+  const medals  = ['gold','silver','bronze'];
+  if (!entries.length) {
+    lbList.innerHTML = '<p class="lb-empty">no scores yet — be the first!</p>';
+    return;
+  }
+  lbList.innerHTML = entries.map((e,i) => `
+    <div class="lb-row">
+      <span class="lb-rank ${medals[i]||''}">#${i+1}</span>
+      <span class="lb-name">${e.player_name}</span>
+      <span class="lb-val">${e.display||e.score+' pts'}</span>
+    </div>
+  `).join('');
+}
+
+initGame();
+loadLeaderboard();
+</script>
+</body>
+</html>
